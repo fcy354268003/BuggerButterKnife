@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="imgUrl" format="string" />
+    <attr name="radius" format="dimension" />
+    <declare-styleable name="CircleImg">
+        <attr name="radius" />
+        <attr name="imgUrl" />
+    </declare-styleable>
+</resources>
