@@ -13,6 +13,7 @@ import javax.lang.model.element.Element
 import javax.lang.model.element.Modifier
 import javax.lang.model.element.TypeElement
 import javax.lang.model.util.Elements
+import javax.tools.Diagnostic
 
 //_ViewBinding
 private const val SUFFIX = "_ViewBinding"
@@ -20,36 +21,21 @@ private const val FUN_BIND = "bind"
 private const val FUN_UNBIND = "unbind"
 
 class MyProcessor : AbstractProcessor() {
-    private var mMessager: Messager? = null
-
-    //        get() = processingEnv.messager
-    private var mElementUtils: Elements? = null
-
-    //        get() = processingEnv.elementUtils
-    private var mFiler: Filer? = null
-
-    //        get() = processingEnv.filer
+    private val mMessager: Messager
+        get() = processingEnv.messager
+    private val mElementUtils: Elements
+        get() = processingEnv.elementUtils
+    private val mFiler: Filer
+        get() = processingEnv.filer
     private val mAnnotationType: List<Class<out Annotation>> =
         listOf(BindView::class.java, BindLayout::class.java, BindClick::class.java)
-    private val supportType =
-        setOf<Class<out Any>>(BindView::class.java, BindLayout::class.java, BindClick::class.java)
-
-    override fun init(processingEnv: ProcessingEnvironment?) {
-        super.init(processingEnv)
-        processingEnv?.apply {
-            mMessager = messager
-            mElementUtils = elementUtils
-            mFiler = filer
-
-        }
-    }
 
     override fun process(
         annotations: MutableSet<out TypeElement>?,
         roundEnv: RoundEnvironment?
     ): Boolean {
+        mMessager.printMessage(Diagnostic.Kind.WARNING, "process ${roundEnv}")
         roundEnv?.let {
-//            mMessager.printMessage(Diagnostic.Kind.ERROR, "process")
             val annotationInfo = mutableMapOf<Element, MutableList<BindElementInfo<out Any>>>()
             //todo save the activity annotation info
             //process the annotation
@@ -62,7 +48,7 @@ class MyProcessor : AbstractProcessor() {
 
     private fun createJavaFile(map: MutableMap<Element, MutableList<BindElementInfo<out Any>>>) {
         for (element in map.keys) {
-            val packageName = mElementUtils?.getPackageOf(element)?.qualifiedName?.toString()
+            val packageName = mElementUtils.getPackageOf(element)?.qualifiedName?.toString()
             val bindMB = MethodSpec.methodBuilder(FUN_BIND)
                 .returns(TypeName.VOID)
                 .addModifiers(Modifier.PUBLIC)
@@ -71,7 +57,7 @@ class MyProcessor : AbstractProcessor() {
             if (infoList == null || infoList.size == 0)
                 return
             if (infoList[0].annotation is BindLayout) {
-                bindMB.addStatement("activity.setContentView(${infoList[0].id});")
+                bindMB.addStatement("""activity.setContentView(${infoList[0].id});""")
             }
             infoList.forEach {
                 when (it.annotation) {
@@ -120,6 +106,7 @@ class MyProcessor : AbstractProcessor() {
             roundEnv.getElementsAnnotatedWith(clazz).forEach { element ->
                 when (val annotation = element.getAnnotation(clazz)) {
                     is BindView -> {
+                        mMessager.printMessage(Diagnostic.Kind.WARNING,"${annotation}")
                         if (!annotationInfo.containsKey(element.enclosingElement)) {
                             annotationInfo[element.enclosingElement] = mutableListOf()
                         }
@@ -132,6 +119,7 @@ class MyProcessor : AbstractProcessor() {
                         )
                     }
                     is BindLayout -> {
+                        mMessager.printMessage(Diagnostic.Kind.WARNING,"${annotation}")
                         if (!annotationInfo.containsKey(element)) {
                             annotationInfo[element] = mutableListOf()
                         }
@@ -145,6 +133,7 @@ class MyProcessor : AbstractProcessor() {
                         )
                     }
                     is BindClick -> {
+                        mMessager.printMessage(Diagnostic.Kind.WARNING,"${annotation}")
                         if (!annotationInfo.containsKey(element.enclosingElement)) {
                             annotationInfo[element.enclosingElement] = mutableListOf()
                         }
@@ -162,14 +151,11 @@ class MyProcessor : AbstractProcessor() {
             }
         }
     }
+// will decide the @process function's parameter annotations
+// if this function return empty will not run process function
+    override fun getSupportedAnnotationTypes(): MutableSet<String> =
+        mAnnotationType.mapTo(HashSet(), Class<out Annotation>::getCanonicalName)
 
-    override fun getSupportedAnnotationTypes(): MutableSet<String> {
-        val it = HashSet<String>()
-//        it.add(BindView::class.java.canonicalName)
-        it.add(BindLayout::class.java.canonicalName)
-//        it.add(BindClick::class.java.canonicalName)
-        return it
-    }
 
     override fun getSupportedSourceVersion(): SourceVersion {
         return SourceVersion.RELEASE_8
@@ -177,15 +163,4 @@ class MyProcessor : AbstractProcessor() {
 
 
 }
-//
-//
-//internal inline fun <reified T> bind(activity: T) = runCatching {
-//    activity?.apply {
-//        // todo activityViewBinding bindMethod 可以尝试做一个缓存 -> 反射效率低问题
-//        val processedName = this::class.java.canonicalName + SUFFIX
-//        val clazz = Class.forName(processedName)
-//        val activityViewBinding = clazz.getConstructor().newInstance()
-//        val bindMethod = clazz.getDeclaredMethod(FUN_BIND, this::class.java)
-//        bindMethod.invoke(activityViewBinding, this)
-//    }
-//}.exceptionOrNull()?.printStackTrace()
+
